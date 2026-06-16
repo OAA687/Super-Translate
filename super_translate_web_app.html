@@ -1,0 +1,1387 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Super Translate - Liquid Glassmorphism translation platform</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght=300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Plus Jakarta Sans', 'sans-serif'],
+          },
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Reset & Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.03);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    body {
+      overflow-x: hidden;
+      background-color: #0b0c15;
+    }
+
+    /* Glassmorphism Classes */
+    .glass-card {
+      background: rgba(255, 255, 255, 0.03);
+      backdrop-filter: blur(25px);
+      -webkit-backdrop-filter: blur(25px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+    }
+
+    .glass-sidebar {
+      background: rgba(10, 11, 22, 0.85);
+      backdrop-filter: blur(40px);
+      -webkit-backdrop-filter: blur(40px);
+      border-left: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: -20px 0 40px rgba(0, 0, 0, 0.6);
+    }
+
+    /* Custom Transitions */
+    .theme-transition {
+      transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* Staggered Sidebar Items animation support */
+    .stagger-item {
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1), transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .sidebar-active .stagger-item {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* Hamburger Animation to 'X' */
+    .hamburger-line {
+      transition: transform 0.3s ease, opacity 0.3s ease, background-color 0.3s ease;
+    }
+    .hamburger-active .line1 {
+      transform: translateY(6px) rotate(45deg);
+    }
+    .hamburger-active .line2 {
+      opacity: 0;
+    }
+    .hamburger-active .line3 {
+      transform: translateY(-6px) rotate(-45deg);
+    }
+
+    /* Glowing Border Effects using CSS variables synced with JS */
+    .glow-border {
+      position: relative;
+    }
+    .glow-border::after {
+      content: '';
+      position: absolute;
+      inset: -1px;
+      border-radius: inherit;
+      padding: 1px;
+      background: linear-gradient(to bottom, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.02));
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      pointer-events: none;
+      transition: background 0.5s ease;
+    }
+    .glow-border:hover::after {
+      background: linear-gradient(135deg, var(--theme-color-primary, #a855f7), rgba(255, 255, 255, 0.3));
+    }
+
+    /* Pulse active mode marker */
+    .mode-active {
+      background: rgba(255, 255, 255, 0.08) !important;
+      border-color: var(--theme-color-primary, #a855f7) !important;
+      color: #fff !important;
+    }
+
+    /* Toast Container sliding effects */
+    #toast-notification {
+      transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease;
+    }
+
+    /* Wave visualizer animation */
+    @keyframes wave {
+      0%, 100% { height: 4px; }
+      50% { height: 16px; }
+    }
+    .wave-bar {
+      animation: wave 0.8s ease-in-out infinite;
+    }
+    .wave-bar:nth-child(2) { animation-delay: 0.15s; }
+    .wave-bar:nth-child(3) { animation-delay: 0.3s; }
+    .wave-bar:nth-child(4) { animation-delay: 0.45s; }
+    .wave-bar:nth-child(5) { animation-delay: 0.6s; }
+
+    /* Word Highlight Class (Clean Inline-based highlight box - NO MISALIGNMENTS) */
+    .tts-word {
+      display: inline; /* Changed to native inline flow to ensure perfect text fitting and no line gaps */
+      transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+      border-radius: 4px;
+      padding: 1px 2px;
+      margin: 0;
+      border: 1px solid transparent;
+    }
+  </style>
+</head>
+<body class="text-gray-100 font-sans min-h-screen relative overflow-x-hidden flex flex-col justify-between select-none">
+
+  <!-- Background Liquid Blobs Canvas -->
+  <canvas id="liquid-canvas" class="fixed top-0 left-0 w-full h-full -z-10 pointer-events-none"></canvas>
+
+  <!-- BACKGROUND RADIAL GLOWS FOR EXTRA DEPTH -->
+  <div class="fixed top-1/4 left-1/4 w-96 h-96 rounded-full blur-[120px] opacity-20 pointer-events-none theme-transition -z-20" id="bg-glow-1" style="background-color: #a855f7;"></div>
+  <div class="fixed bottom-1/4 right-1/4 w-96 h-96 rounded-full blur-[120px] opacity-20 pointer-events-none theme-transition -z-20" id="bg-glow-2" style="background-color: #3b82f6;"></div>
+
+  <!-- BACKGROUND OVERLAY FOR CLOSING MENU -->
+  <div id="sidebar-overlay" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-30 opacity-0 pointer-events-none transition-opacity duration-300"></div>
+
+  <!-- HEADER -->
+  <header class="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex items-center justify-between relative z-40">
+    <!-- Logo -->
+    <a href="#" class="flex items-center space-x-3 group">
+      <div class="w-10 h-10 rounded-xl flex items-center justify-center relative overflow-hidden glass-card glow-border theme-transition" id="logo-icon">
+        <i class="fa-solid fa-language text-xl theme-transition text-purple-400" id="logo-icon-i"></i>
+      </div>
+      <span class="text-xl font-extrabold tracking-tight bg-gradient-to-r from-white via-gray-100 to-gray-400 bg-clip-text text-transparent">
+        SUPER <span class="theme-transition text-purple-400" id="logo-text">TRANSLATE</span>
+      </span>
+    </a>
+
+    <!-- Navigation - Quick Modes (Desktop) -->
+    <nav class="hidden md:flex items-center space-x-2 glass-card rounded-full p-1.5 glow-border">
+      <button id="nav-text-btn" onclick="switchMode('text', this)" class="quick-mode-btn mode-active px-5 py-2 rounded-full text-sm font-medium text-gray-400 hover:text-white transition-all flex items-center space-x-2">
+        <i class="fa-solid fa-file-lines text-xs"></i>
+        <span id="nav-text-lbl">Văn bản</span>
+      </button>
+      <button id="nav-image-btn" onclick="switchMode('image', this)" class="quick-mode-btn px-5 py-2 rounded-full text-sm font-medium text-gray-400 hover:text-white transition-all flex items-center space-x-2">
+        <i class="fa-solid fa-image text-xs"></i>
+        <span id="nav-image-lbl">Hình ảnh AI</span>
+      </button>
+      <button id="nav-voice-btn" onclick="switchMode('voice', this)" class="quick-mode-btn px-5 py-2 rounded-full text-sm font-medium text-gray-400 hover:text-white transition-all flex items-center space-x-2">
+        <i class="fa-solid fa-microphone text-xs"></i>
+        <span id="nav-voice-lbl">Giọng nói</span>
+      </button>
+      <button id="nav-doc-btn" onclick="switchMode('doc', this)" class="quick-mode-btn px-5 py-2 rounded-full text-sm font-medium text-gray-400 hover:text-white transition-all flex items-center space-x-2">
+        <i class="fa-solid fa-file-pdf text-xs"></i>
+        <span id="nav-doc-lbl">Tài liệu</span>
+      </button>
+    </nav>
+
+    <!-- Right Controls: Hamburger & Accent Color -->
+    <div class="flex items-center space-x-4">
+      <button id="hamburger-btn" class="w-11 h-11 rounded-full flex flex-col items-center justify-center space-y-1 glass-card glow-border hover:scale-105 active:scale-95 transition-all relative z-50 focus:outline-none" aria-label="Toggle Menu">
+        <span class="hamburger-line line1 w-5 h-0.5 bg-gray-300 rounded-full"></span>
+        <span class="hamburger-line line2 w-5 h-0.5 bg-gray-300 rounded-full"></span>
+        <span class="hamburger-line line3 w-5 h-0.5 bg-gray-300 rounded-full"></span>
+      </button>
+    </div>
+  </header>
+
+  <!-- QUICK MODE NAVIGATION FOR MOBILE -->
+  <div class="md:hidden w-full px-4 mb-4 relative z-20">
+    <div class="glass-card rounded-2xl p-2 flex items-center justify-between overflow-x-auto gap-1">
+      <button onclick="switchMode('text', this)" class="quick-mode-btn mode-active flex-1 py-2.5 rounded-xl text-xs font-semibold text-gray-400 hover:text-white transition-all flex flex-col items-center gap-1 min-w-[70px]">
+        <i class="fa-solid fa-file-lines"></i>
+        <span class="mob-nav-lbl" data-key="navText">Văn bản</span>
+      </button>
+      <button onclick="switchMode('image', this)" class="quick-mode-btn flex-1 py-2.5 rounded-xl text-xs font-semibold text-gray-400 hover:text-white transition-all flex flex-col items-center gap-1 min-w-[70px]">
+        <i class="fa-solid fa-image"></i>
+        <span class="mob-nav-lbl" data-key="navImage">Ảnh AI</span>
+      </button>
+      <button onclick="switchMode('voice', this)" class="quick-mode-btn flex-1 py-2.5 rounded-xl text-xs font-semibold text-gray-400 hover:text-white transition-all flex flex-col items-center gap-1 min-w-[70px]">
+        <i class="fa-solid fa-microphone"></i>
+        <span class="mob-nav-lbl" data-key="navVoice">Giọng nói</span>
+      </button>
+      <button onclick="switchMode('doc', this)" class="quick-mode-btn flex-1 py-2.5 rounded-xl text-xs font-semibold text-gray-400 hover:text-white transition-all flex flex-col items-center gap-1 min-w-[70px]">
+        <i class="fa-solid fa-file-pdf"></i>
+        <span class="mob-nav-lbl" data-key="navDoc">Tài liệu</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- MAIN TRANSLATION INTERFACE -->
+  <main class="flex-grow w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col justify-center relative z-20">
+    
+    <!-- Active Feature Indicator Ribbon -->
+    <div id="feature-ribbon" class="text-center mb-6 transition-all duration-500 ease-out">
+      <span class="px-4 py-1.5 rounded-full text-xs font-semibold bg-white/5 border border-white/10 tracking-wide uppercase text-gray-300">
+        <span id="ribbon-prefix">Chế độ: </span><strong id="current-mode-title" class="theme-transition text-purple-400">Dịch văn bản</strong>
+      </span>
+    </div>
+
+    <!-- MAIN TRANSLATOR LAYOUT -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch min-h-[480px]">
+      
+      <!-- COLUMN LEFT: SOURCE LANGUAGE -->
+      <div class="glass-card rounded-3xl p-6 md:p-8 flex flex-col justify-between glow-border relative overflow-hidden">
+        <div class="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-transparent via-purple-500/30 to-transparent theme-transition" id="card-top-glow-left"></div>
+        
+        <!-- Controls Header Left -->
+        <div>
+          <div class="flex items-center justify-between pb-4 border-b border-white/5">
+            <div class="flex items-center space-x-3">
+              <span id="source-header-lbl" class="text-xs font-bold uppercase tracking-wider text-gray-400">Nguồn</span>
+              <div class="relative inline-block text-left">
+                <select id="source-lang-select" class="bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 text-xs font-semibold text-white focus:outline-none focus:ring-1 focus:ring-purple-500/50 appearance-none pr-8 cursor-pointer hover:bg-white/10 transition-all">
+                  <option class="bg-[#0f111a]" value="auto" id="opt-auto-detect" selected>Tự động nhận diện</option>
+                  <option class="bg-[#0f111a]" value="en">Tiếng Anh</option>
+                  <option class="bg-[#0f111a]" value="vi">Tiếng Việt</option>
+                  <option class="bg-[#0f111a]" value="ja">Tiếng Nhật</option>
+                  <option class="bg-[#0f111a]" value="ko">Tiếng Hàn</option>
+                  <option class="bg-[#0f111a]" value="zh">Tiếng Trung</option>
+                </select>
+                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
+                  <i class="fa-solid fa-chevron-down text-[10px]"></i>
+                </div>
+              </div>
+            </div>
+            
+            <button onclick="clearText()" class="text-gray-500 hover:text-white text-xs py-1 px-2.5 rounded-lg hover:bg-white/5 transition-all flex items-center space-x-1">
+              <i class="fa-solid fa-trash-can"></i>
+              <span id="clear-btn-lbl" class="hidden sm:inline">Xóa</span>
+            </button>
+          </div>
+
+          <!-- Dynamic Panel Content Left -->
+          <div class="mt-6 relative min-h-[220px]">
+            
+            <!-- Chế độ 1: Dịch Văn bản (Mặc định) -->
+            <div id="source-panel-text" class="mode-panel relative">
+              <!-- Textarea chính -->
+              <textarea id="source-textarea" placeholder="Nhập văn bản cần dịch tại đây..." class="w-full bg-transparent border-0 outline-none resize-none text-white text-lg md:text-xl placeholder-gray-500 focus:ring-0 min-h-[220px] max-h-[280px]" maxlength="2000"></textarea>
+              
+              <!-- Khung giả hiển thị highlight cực sạch (HOÀN TOÀN TRONG SUỐT - KHÔNG CHE KHUẤT NỀN) -->
+              <div id="source-highlight-overlay" class="absolute inset-0 bg-transparent text-lg md:text-xl leading-relaxed text-gray-400 overflow-y-auto hidden select-text font-medium pointer-events-none"></div>
+
+              <div class="text-right text-xs text-gray-500 mt-2">
+                <span id="char-count">0</span> / 2000 <span id="char-count-lbl">ký tự</span>
+              </div>
+            </div>
+
+            <!-- Chế độ 2: Ảnh AI -->
+            <div id="source-panel-image" class="mode-panel hidden">
+              <div class="flex flex-col items-center justify-center min-h-[200px] border-2 border-dashed border-white/10 rounded-2xl p-6 hover:border-white/20 transition-all cursor-pointer relative group" onclick="triggerImageUpload()">
+                <input type="file" id="image-file-input" class="hidden" accept="image/*" onchange="handleImageUpload(event)">
+                <div class="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4 group-hover:scale-110 transition-all duration-300 border border-white/10" id="upload-image-icon-box">
+                  <i class="fa-solid fa-camera-rotate text-2xl text-purple-400 theme-transition" id="upload-image-icon"></i>
+                </div>
+                <p id="upload-img-title" class="text-sm font-semibold text-white text-center">Tải lên hình ảnh cần quét</p>
+                <p id="upload-img-sub" class="text-xs text-gray-500 text-center mt-1">Hỗ trợ quét chữ tự động (OCR)</p>
+                <div id="image-preview-container" class="absolute inset-0 bg-black/80 rounded-2xl hidden flex-col items-center justify-center p-2">
+                  <img id="image-preview" src="" alt="Quét ảnh" class="max-h-[140px] object-contain rounded-lg shadow-lg">
+                  <button id="btn-remove-img" onclick="removeUploadedImage(event)" class="mt-3 px-3 py-1 bg-red-500/20 hover:bg-red-500/40 text-red-300 border border-red-500/30 rounded-lg text-xs font-semibold transition-all">Gỡ ảnh</button>
+                </div>
+              </div>
+              <!-- Text thu được từ OCR cho người dùng xem và sửa -->
+              <div class="mt-4 relative">
+                <label id="ocr-lbl" class="block text-[11px] font-bold text-gray-400 mb-1.5 uppercase">Nội dung quét được từ ảnh:</label>
+                <textarea id="image-ocr-textarea" placeholder="Nội dung chữ sau khi quét ảnh sẽ xuất hiện tại đây để bạn chỉnh sửa..." class="w-full bg-transparent border-0 outline-none resize-none text-white text-sm outline-none min-h-[80px] focus:ring-0 transition-all"></textarea>
+                <!-- Overlay highlight trong suốt -->
+                <div id="image-highlight-overlay" class="absolute inset-x-0 bottom-0 top-[22px] bg-transparent text-sm leading-relaxed text-gray-400 overflow-y-auto hidden select-text pointer-events-none"></div>
+              </div>
+            </div>
+
+            <!-- Chế độ 3: Giọng nói -->
+            <div id="source-panel-voice" class="mode-panel hidden flex flex-col items-center justify-center min-h-[220px] p-4 text-center">
+              <div class="relative w-24 h-24 flex items-center justify-center mb-4">
+                <div class="absolute inset-0 rounded-full bg-purple-500/10 animate-ping theme-transition hidden" id="voice-pulse-outer"></div>
+                <button id="voice-mic-btn" onclick="toggleVoiceRecording()" class="relative z-10 w-16 h-16 rounded-full bg-purple-500 hover:bg-purple-600 flex items-center justify-center text-white shadow-lg transition-all focus:outline-none theme-transition">
+                  <i class="fa-solid fa-microphone text-xl" id="mic-icon"></i>
+                </button>
+              </div>
+              <p class="text-sm font-semibold text-white" id="voice-status-text">Bấm nút để bắt đầu nói</p>
+              
+              <!-- Live Transcript Box -->
+              <div class="w-full mt-4 relative">
+                <label id="voice-transcript-lbl" class="block text-[11px] font-bold text-gray-400 mb-1.5 uppercase">Văn bản nhận diện:</label>
+                <textarea id="voice-transcript-textarea" placeholder="Văn bản nhận diện giọng nói thực tế..." class="w-full bg-transparent border-0 outline-none resize-none text-white text-sm outline-none min-h-[80px] focus:ring-0 transition-all"></textarea>
+                <!-- Overlay highlight trong suốt -->
+                <div id="voice-highlight-overlay" class="absolute inset-x-0 bottom-0 top-[22px] bg-transparent text-sm leading-relaxed text-gray-400 overflow-y-auto hidden select-text pointer-events-none"></div>
+              </div>
+            </div>
+
+            <!-- Chế độ 4: Tài liệu -->
+            <div id="source-panel-doc" class="mode-panel hidden">
+              <div class="flex flex-col items-center justify-center min-h-[200px] border-2 border-dashed border-white/10 rounded-2xl p-6 hover:border-white/20 transition-all cursor-pointer relative group" onclick="triggerDocUpload()">
+                <input type="file" id="doc-file-input" class="hidden" accept=".pdf,.doc,.docx,.xls,.xlsx" onchange="handleDocUpload(event)">
+                <div class="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4 group-hover:scale-110 transition-all duration-300 border border-white/10" id="upload-doc-icon-box">
+                  <i class="fa-solid fa-file-invoice text-2xl text-purple-400 theme-transition" id="upload-doc-icon"></i>
+                </div>
+                <p id="upload-doc-title" class="text-sm font-semibold text-white text-center">Kéo & Thả hoặc Nhấp chọn tài liệu</p>
+                <p id="upload-doc-sub" class="text-xs text-gray-500 text-center mt-1">Hỗ trợ PDF, DOCX, XLSX</p>
+                <div id="doc-preview-container" class="absolute inset-0 bg-[#121422]/95 rounded-2xl hidden flex-col items-center justify-center p-4">
+                  <i class="fa-regular fa-file-pdf text-4xl text-red-400 mb-2" id="doc-type-icon"></i>
+                  <p id="doc-name-text" class="text-sm font-bold text-white text-center truncate max-w-[240px]">Document.pdf</p>
+                  <button id="btn-remove-doc" onclick="removeUploadedDoc(event)" class="mt-3 px-3 py-1 bg-red-500/20 hover:bg-red-500/40 text-red-300 border border-red-500/30 rounded-lg text-xs font-semibold transition-all">Gỡ tệp</button>
+                </div>
+              </div>
+              <div class="mt-4 relative">
+                <label id="doc-raw-lbl" class="block text-[11px] font-bold text-gray-400 mb-1.5 uppercase">Xem nội dung tệp:</label>
+                <textarea id="doc-raw-textarea" placeholder="Văn bản trích xuất từ tài liệu..." class="w-full bg-transparent border-0 outline-none resize-none text-white text-sm outline-none min-h-[80px] focus:ring-0 transition-all"></textarea>
+                <!-- Overlay highlight trong suốt -->
+                <div id="doc-highlight-overlay" class="absolute inset-x-0 bottom-0 top-[22px] bg-transparent text-sm leading-relaxed text-gray-400 overflow-y-auto hidden select-text pointer-events-none"></div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Footer Actions Left -->
+        <div class="flex items-center justify-between mt-6 pt-4 border-t border-white/5">
+          <div class="flex items-center space-x-2">
+            <button id="source-speak-btn" onclick="playAudio('source')" class="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center text-gray-400 hover:text-white transition-all glow-border relative" title="Nghe giọng đọc nguồn">
+              <i class="fa-solid fa-volume-high text-xs" id="source-speak-icon"></i>
+              <div id="source-wave-indicator" class="absolute inset-0 flex items-center justify-center space-x-0.5 bg-[#121422] rounded-xl hidden">
+                <span class="wave-bar w-0.5 bg-purple-400 rounded h-1"></span>
+                <span class="wave-bar w-0.5 bg-purple-400 rounded h-3"></span>
+                <span class="wave-bar w-0.5 bg-purple-400 rounded h-2"></span>
+              </div>
+            </button>
+            <button id="main-mic-control-btn" onclick="toggleMainInputMic()" class="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center text-gray-400 hover:text-white transition-all glow-border" title="Nói để nhập">
+              <i class="fa-solid fa-microphone text-xs" id="main-mic-control-icon"></i>
+            </button>
+          </div>
+
+          <button id="translate-trigger-btn" onclick="performTranslation()" class="px-6 py-3 rounded-xl bg-purple-500 hover:bg-purple-600 font-bold text-sm tracking-wide text-white shadow-lg shadow-purple-500/20 hover:shadow-purple-500/35 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 transition-all flex items-center space-x-2 theme-transition">
+            <span id="translate-btn-text">Dịch Ngay</span>
+            <i class="fa-solid fa-arrow-right text-xs"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- COLUMN RIGHT: DESTINATION LANGUAGE -->
+      <div class="glass-card rounded-3xl p-6 md:p-8 flex flex-col justify-between glow-border relative overflow-hidden">
+        <div class="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-transparent via-purple-500/30 to-transparent theme-transition" id="card-top-glow-right"></div>
+        
+        <!-- Controls Header Right -->
+        <div>
+          <div class="flex items-center justify-between pb-4 border-b border-white/5">
+            <div class="flex items-center space-x-3">
+              <span id="target-header-lbl" class="text-xs font-bold uppercase tracking-wider text-gray-400">Đích</span>
+              <div class="relative inline-block text-left">
+                <select id="target-lang-select" class="bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 text-xs font-semibold text-white focus:outline-none focus:ring-1 focus:ring-purple-500/50 appearance-none pr-8 cursor-pointer hover:bg-white/10 transition-all">
+                  <option class="bg-[#0f111a]" value="vi" id="opt-dest-vi" selected>Tiếng Việt</option>
+                  <option class="bg-[#0f111a]" value="en" id="opt-dest-en">Tiếng Anh</option>
+                  <option class="bg-[#0f111a]" value="ja" id="opt-dest-ja">Tiếng Nhật</option>
+                  <option class="bg-[#0f111a]" value="ko" id="opt-dest-ko">Tiếng Hàn</option>
+                  <option class="bg-[#0f111a]" value="zh" id="opt-dest-zh">Tiếng Trung</option>
+                </select>
+                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
+                  <i class="fa-solid fa-chevron-down text-[10px]"></i>
+                </div>
+              </div>
+            </div>
+
+            <!-- Copy feedback message -->
+            <div id="copy-toast" class="opacity-0 transition-opacity duration-300 text-xs text-green-400 bg-green-500/10 px-3 py-1 rounded-lg border border-green-500/20 flex items-center space-x-1">
+              <i class="fa-solid fa-check"></i>
+              <span id="copy-toast-lbl">Đã sao chép!</span>
+            </div>
+          </div>
+
+          <!-- Output Panel Content Right -->
+          <div class="mt-6 relative min-h-[220px] flex flex-col">
+            <!-- Loading overlay -->
+            <div id="translation-loader" class="absolute inset-0 bg-black/10 backdrop-blur-[2px] z-10 hidden flex-col items-center justify-center rounded-2xl">
+              <div class="w-12 h-12 rounded-full border-4 border-white/5 border-t-purple-500 animate-spin theme-transition" id="loader-spinner"></div>
+              <p id="loader-text-lbl" class="text-xs text-gray-400 mt-4 animate-pulse">AI đang dịch thuật...</p>
+            </div>
+
+            <!-- Translate Output Text Container -->
+            <div id="output-content-area" class="w-full text-white text-lg md:text-xl min-h-[220px] max-h-[280px] overflow-y-auto pr-2 break-words leading-relaxed select-text font-medium text-gray-200">
+              <span id="output-placeholder-lbl" class="text-gray-500 italic text-base font-normal">Kết quả dịch sẽ hiển thị mượt mà tại đây sau khi bạn tiến hành dịch.</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Footer Actions Right -->
+        <div class="flex items-center justify-between mt-6 pt-4 border-t border-white/5">
+          <div class="flex items-center space-x-2">
+            <button id="target-speak-btn" onclick="playAudio('target')" class="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center text-gray-400 hover:text-white transition-all glow-border relative" title="Phát giọng đọc kết quả">
+              <i class="fa-solid fa-volume-high text-xs" id="target-speak-icon"></i>
+              <div id="target-wave-indicator" class="absolute inset-0 flex items-center justify-center space-x-0.5 bg-[#121422] rounded-xl hidden">
+                <span class="wave-bar w-0.5 bg-purple-400 rounded h-2"></span>
+                <span class="wave-bar w-0.5 bg-purple-400 rounded h-4"></span>
+                <span class="wave-bar w-0.5 bg-purple-400 rounded h-1"></span>
+              </div>
+            </button>
+            <button onclick="copyToClipboard()" class="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center text-gray-400 hover:text-white transition-all glow-border" title="Sao chép kết quả">
+              <i class="fa-regular fa-copy text-xs"></i>
+            </button>
+          </div>
+
+          <!-- Quality Badge / HTTPS Status Indicators -->
+          <div class="flex items-center space-x-2">
+            <span id="https-badge" class="px-2 py-1 bg-green-500/10 text-green-400 border border-green-500/20 text-[9px] rounded font-bold tracking-wide flex items-center space-x-1">
+              <i class="fa-solid fa-shield-halved"></i>
+              <span>HTTPS</span>
+            </span>
+            <div class="flex items-center space-x-1.5 text-[10px] uppercase tracking-wider text-gray-500 bg-white/5 px-2.5 py-1.5 rounded-lg border border-white/5 font-semibold">
+              <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+              <span>AI ENGINE V2.5</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- FLOATING TOAST MESSAGE CONTAINER -->
+  <div id="toast-notification" class="fixed bottom-6 right-6 z-50 glass-card rounded-2xl p-4 border border-white/15 max-w-sm w-[90vw] shadow-2xl flex items-start space-x-3 translate-y-12 opacity-0 pointer-events-none">
+    <div id="toast-icon-wrapper" class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0">
+      <i id="toast-icon" class="fa-solid fa-circle-exclamation"></i>
+    </div>
+    <div class="flex-grow">
+      <h5 id="toast-title" class="text-xs font-bold text-white">Cảnh báo</h5>
+      <p id="toast-body" class="text-xs text-gray-400 mt-1 leading-relaxed">Nội dung thông báo.</p>
+    </div>
+    <button onclick="dismissToast()" class="text-gray-500 hover:text-white transition-colors">
+      <i class="fa-solid fa-xmark text-sm"></i>
+    </button>
+  </div>
+
+  <!-- SIDEBAR MENU WITH INSTANT ACTIONABLE DISMISS CONTROLS -->
+  <div id="sidebar-menu" class="fixed top-0 right-0 h-full w-[85vw] sm:w-[45vw] z-40 glass-sidebar translate-x-full transition-transform duration-500 ease-out flex flex-col justify-between">
+    <div class="absolute top-6 left-6 right-6 flex items-center justify-between">
+      <span class="text-xs font-bold uppercase tracking-wider text-purple-400 theme-transition" id="sidebar-title-text">Cấu hình hệ thống</span>
+      <button onclick="closeSidebar()" class="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-gray-400 hover:text-white transition-all border border-white/10">
+        <i class="fa-solid fa-xmark text-xs"></i>
+      </button>
+    </div>
+
+    <div class="p-6 md:p-8 pt-24 overflow-y-auto flex-grow flex flex-col space-y-8">
+      
+      <!-- STAGGER GROUP 1: THEME COLOR PICKER -->
+      <div class="stagger-item" style="transition-delay: 0.1s;">
+        <h4 id="sb-theme-title" class="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4 flex items-center space-x-2">
+          <i class="fa-solid fa-palette"></i>
+          <span>Chỉnh màu giao diện</span>
+        </h4>
+        <p id="sb-theme-desc" class="text-xs text-gray-500 mb-3 leading-relaxed">Chọn tông màu phong cách để đồng bộ hóa giao diện và dòng chảy chất lỏng nền:</p>
+        <div class="grid grid-cols-5 gap-3" id="theme-pickers-container"></div>
+      </div>
+
+      <!-- STAGGER GROUP 2: DYNAMIC LANGUAGE TRANSLATOR CONTROL -->
+      <div class="stagger-item" style="transition-delay: 0.25s;">
+        <h4 id="sb-lang-title" class="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4 flex items-center space-x-2">
+          <i class="fa-solid fa-globe"></i>
+          <span>Ngôn ngữ giao diện</span>
+        </h4>
+        <p id="sb-lang-desc" class="text-xs text-gray-500 mb-3 leading-relaxed">Chọn ngôn ngữ hiển thị của ứng dụng:</p>
+        
+        <div class="flex space-x-2 bg-white/5 rounded-2xl p-1 border border-white/10">
+          <button id="lang-btn-vi" onclick="setUiLanguage('vi')" class="flex-1 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center space-x-2 bg-white/10 border border-white/10 text-white">
+            <span>🇻🇳 Tiếng Việt</span>
+          </button>
+          <button id="lang-btn-en" onclick="setUiLanguage('en')" class="flex-1 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center space-x-2 text-gray-400 hover:text-white">
+            <span>🇬🇧 English</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- STAGGER GROUP 3: TEXT TO SPEECH SETTINGS -->
+      <div class="stagger-item" style="transition-delay: 0.4s;">
+        <h4 id="sb-tts-title" class="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4 flex items-center space-x-2">
+          <i class="fa-solid fa-volume-high"></i>
+          <span>Cấu hình giọng đọc</span>
+        </h4>
+        <p id="sb-tts-desc" class="text-xs text-gray-500 mb-3 leading-relaxed">Chọn hệ cơ sở giọng nói hoặc sử dụng cấu hình mặc định của thiết bị:</p>
+        
+        <div class="space-y-4">
+          <div class="relative">
+            <label id="sb-tts-voice-label" class="block text-[11px] font-semibold text-gray-400 mb-1.5">Bộ lọc giọng đọc</label>
+            <select id="tts-voice-type" class="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-xs font-semibold text-white focus:outline-none focus:ring-1 focus:ring-purple-500 appearance-none pr-8 cursor-pointer hover:bg-white/10 transition-all">
+              <option class="bg-[#0f111a]" value="system" id="opt-sys-default" selected>Sử dụng công cụ thiết bị (System Default)</option>
+            </select>
+            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 pt-6 text-gray-400">
+              <i class="fa-solid fa-chevron-down text-[10px]"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CORE SCRIPT LOGIC -->
+  <script>
+    // --- GLOBAL INTERNATIONALIZATION STATE (i18n) ---
+    let currentUiLang = 'vi'; // Default locale is Vietnamese
+
+    const UI_DICTIONARY = {
+      vi: {
+        logoSub: "TRANSLATE",
+        navText: "Văn bản",
+        navImage: "Hình ảnh AI",
+        navVoice: "Giọng nói",
+        navDoc: "Tài liệu",
+        ribbonPrefix: "Chế độ: ",
+        modeText: "Dịch văn bản",
+        modeImage: "Dịch hình ảnh AI",
+        modeVoice: "Dịch giọng nói song phương",
+        modeDoc: "Dịch tài liệu",
+        sourceHeader: "Nguồn",
+        targetHeader: "Đích",
+        clearBtn: "Xóa",
+        translateBtnText: "Dịch Ngay",
+        placeholderText: "Nhập văn bản cần dịch tại đây...",
+        placeholderOCR: "Nội dung chữ sau khi quét ảnh sẽ xuất hiện tại đây để bạn chỉnh sửa...",
+        placeholderVoice: "Văn bản nhận diện giọng nói thực tế...",
+        placeholderDoc: "Văn bản trích xuất từ tài liệu...",
+        uploadImgTitle: "Tải lên hình ảnh cần quét",
+        uploadImgSub: "Hỗ trợ quét chữ tự động (OCR)",
+        uploadDocTitle: "Kéo & Thả hoặc Nhấp chọn tài liệu",
+        uploadDocSub: "Hỗ trợ PDF, DOCX, XLSX",
+        ocrTitle: "Nội dung quét được từ ảnh:",
+        voiceTitle: "Văn bản nhận diện:",
+        docTitle: "Xem nội dung tệp:",
+        voiceStatusIdle: "Bấm nút để bắt đầu nói",
+        voiceStatusListening: "● ĐANG LẮNG NGHE...",
+        voiceStatusDone: "Đã nhận diện giọng nói xong!",
+        outputDefault: "Kết quả dịch sẽ hiển thị mượt mà tại đây sau khi bạn tiến hành dịch.",
+        sidebarTitle: "Cấu hình hệ thống",
+        sidebarTheme: "Chỉnh màu giao diện",
+        sidebarThemeDesc: "Chọn tông màu phong cách để đồng bộ hóa giao diện và dòng chảy chất lỏng nền:",
+        sidebarTts: "Cấu hình giọng đọc",
+        sidebarTtsDesc: "Chọn hệ cơ sở giọng nói hoặc sử dụng cấu hình mặc định của thiết bị:",
+        sidebarTtsVoiceLabel: "Bộ lọc giọng đọc",
+        sidebarLang: "Ngôn ngữ giao diện",
+        sidebarLangDesc: "Chọn ngôn ngữ hiển thị của ứng dụng:",
+        securingHttps: "HTTPS AN TOÀN",
+        securingHttp: "HTTP KHÔNG AN TOÀN",
+        optAutoDetect: "Tự động nhận diện",
+        copyToastText: "Đã sao chép!",
+        charCountLabel: "ký tự",
+        btnRemoveImg: "Gỡ ảnh",
+        btnRemoveDoc: "Gỡ tệp",
+        loaderText: "AI đang dịch thuật..."
+      },
+      en: {
+        logoSub: "TRANSLATE",
+        navText: "Text",
+        navImage: "AI Image",
+        navVoice: "Voice",
+        navDoc: "Document",
+        ribbonPrefix: "Mode: ",
+        modeText: "Text Translation",
+        modeImage: "AI Image Translation",
+        modeVoice: "Bilingual Voice Translation",
+        modeDoc: "Document Translation",
+        sourceHeader: "Source",
+        targetHeader: "Target",
+        clearBtn: "Clear",
+        translateBtnText: "Translate Now",
+        placeholderText: "Enter text to translate here...",
+        placeholderOCR: "Scanned text from image will appear here for editing...",
+        placeholderVoice: "Real-time speech transcription text...",
+        placeholderDoc: "Text extracted from the uploaded document...",
+        uploadImgTitle: "Upload image to scan",
+        uploadImgSub: "Supports automatic character recognition (OCR)",
+        uploadDocTitle: "Drag & Drop or Click to select document",
+        uploadDocSub: "Supports PDF, DOCX, XLSX",
+        ocrTitle: "Extracted Content from Image:",
+        voiceTitle: "Recognized Transcript:",
+        docTitle: "File content extracted:",
+        voiceStatusIdle: "Click button to start speaking",
+        voiceStatusListening: "● LISTENING...",
+        voiceStatusDone: "Voice recognized successfully!",
+        outputDefault: "The translation will appear here smoothly after you translate.",
+        sidebarTitle: "System Settings",
+        sidebarTheme: "Interface Color",
+        sidebarThemeDesc: "Choose a stylist color palette to synchronize UI accent and canvas fluid background:",
+        sidebarTts: "TTS Settings",
+        sidebarTtsDesc: "Choose default voice engine or use standard system voice default:",
+        sidebarTtsVoiceLabel: "Voice filters",
+        sidebarLang: "UI Language",
+        sidebarLangDesc: "Select application display language:",
+        securingHttps: "HTTPS SECURE",
+        securingHttp: "HTTP INSECURE",
+        optAutoDetect: "Auto Detect",
+        copyToastText: "Copied!",
+        charCountLabel: "chars",
+        btnRemoveImg: "Remove",
+        btnRemoveDoc: "Remove file",
+        loaderText: "AI is translating..."
+      }
+    };
+
+    function setUiLanguage(lang) {
+      currentUiLang = lang;
+      const btnVi = document.getElementById('lang-btn-vi');
+      const btnEn = document.getElementById('lang-btn-en');
+      if (lang === 'vi') {
+        btnVi.className = "flex-1 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center space-x-2 bg-white/10 border border-white/10 text-white";
+        btnEn.className = "flex-1 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center space-x-2 text-gray-400 hover:text-white";
+      } else {
+        btnEn.className = "flex-1 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center space-x-2 bg-white/10 border border-white/10 text-white";
+        btnVi.className = "flex-1 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center space-x-2 text-gray-400 hover:text-white";
+      }
+
+      const d = UI_DICTIONARY[lang];
+
+      document.getElementById('logo-text').textContent = d.logoSub;
+      document.getElementById('nav-text-lbl').textContent = d.navText;
+      document.getElementById('nav-image-lbl').textContent = d.navImage;
+      document.getElementById('nav-voice-lbl').textContent = d.navVoice;
+      document.getElementById('nav-doc-lbl').textContent = d.navDoc;
+
+      document.querySelectorAll('.mob-nav-lbl').forEach(lbl => {
+        const key = lbl.getAttribute('data-key');
+        if (key && d[key]) lbl.textContent = d[key];
+      });
+
+      document.getElementById('ribbon-prefix').textContent = d.ribbonPrefix;
+      let titleTranslated = d.modeText;
+      if (activeMode === 'image') titleTranslated = d.modeImage;
+      if (activeMode === 'voice') titleTranslated = d.modeVoice;
+      if (activeMode === 'doc') titleTranslated = d.modeDoc;
+      document.getElementById('current-mode-title').textContent = titleTranslated;
+
+      document.getElementById('source-header-lbl').textContent = d.sourceHeader;
+      document.getElementById('target-header-lbl').textContent = d.targetHeader;
+      document.getElementById('clear-btn-lbl').textContent = d.clearBtn;
+      document.getElementById('translate-btn-text').textContent = d.translateBtnText;
+
+      document.getElementById('source-textarea').placeholder = d.placeholderText;
+      document.getElementById('char-count-lbl').textContent = d.charCountLabel;
+      
+      document.getElementById('upload-img-title').textContent = d.uploadImgTitle;
+      document.getElementById('upload-img-sub').textContent = d.uploadImgSub;
+      document.getElementById('btn-remove-img').textContent = d.btnRemoveImg;
+      document.getElementById('ocr-lbl').textContent = d.ocrTitle;
+      document.getElementById('image-ocr-textarea').placeholder = d.placeholderOCR;
+
+      if (!isVoiceRecordingActive) {
+        document.getElementById('voice-status-text').textContent = d.voiceStatusIdle;
+      }
+      document.getElementById('voice-transcript-lbl').textContent = d.voiceTitle;
+      document.getElementById('voice-transcript-textarea').placeholder = d.placeholderVoice;
+
+      document.getElementById('upload-doc-title').textContent = d.uploadDocTitle;
+      document.getElementById('upload-doc-sub').textContent = d.uploadDocSub;
+      document.getElementById('btn-remove-doc').textContent = d.btnRemoveImg;
+      document.getElementById('doc-raw-lbl').textContent = d.docTitle;
+      document.getElementById('doc-raw-textarea').placeholder = d.placeholderDoc;
+
+      document.getElementById('opt-auto-detect').textContent = d.optAutoDetect;
+      
+      const outputArea = document.getElementById('output-content-area');
+      if (outputArea.innerHTML.includes("Kết quả dịch sẽ hiển thị") || outputArea.innerHTML.includes("The translation will appear")) {
+        outputArea.innerHTML = `<span id="output-placeholder-lbl" class="text-gray-500 italic text-base font-normal">${d.outputDefault}</span>`;
+      }
+      document.getElementById('loader-text-lbl').textContent = d.loaderText;
+      document.getElementById('copy-toast-lbl').textContent = d.copyToastText;
+
+      checkHTTPSAndEnvironment();
+
+      document.getElementById('sidebar-title-text').textContent = d.sidebarTitle;
+      document.getElementById('sb-theme-title').lastElementChild.textContent = d.sidebarTheme;
+      document.getElementById('sb-theme-desc').textContent = d.sidebarThemeDesc;
+      document.getElementById('sb-lang-title').lastElementChild.textContent = d.sidebarLang;
+      document.getElementById('sb-lang-desc').textContent = d.sidebarLangDesc;
+      document.getElementById('sb-tts-title').lastElementChild.textContent = d.sidebarTts;
+      document.getElementById('sb-tts-desc').textContent = d.sidebarTtsDesc;
+      document.getElementById('sb-tts-voice-label').textContent = d.sidebarTtsVoiceLabel;
+      document.getElementById('opt-sys-default').textContent = d.optAutoDetect;
+    }
+
+    // --- THEME DATA ---
+    const THEMES = [
+      { id: 'purple', name: 'Tím Cyberpunk', primary: '#a855f7', rgb: '168, 85, 247', bgBlobs: ['#7c3aed', '#3b82f6', '#d946ef'] },
+      { id: 'blue', name: 'Xanh Dương', primary: '#3b82f6', rgb: '59, 130, 246', bgBlobs: ['#2563eb', '#1d4ed8', '#0891b2'] },
+      { id: 'mint', name: 'Xanh Mint', primary: '#10b981', rgb: '16, 185, 129', bgBlobs: ['#059669', '#0891b2', '#10b981'] }
+    ];
+    let currentTheme = THEMES[0];
+
+    const pickerContainer = document.getElementById('theme-pickers-container');
+    THEMES.forEach(t => {
+      const btn = document.createElement('button');
+      btn.className = `theme-swatch w-10 h-10 rounded-full border-2 transition-all hover:scale-110 active:scale-95 duration-300 relative flex items-center justify-center`;
+      btn.style.backgroundColor = t.primary;
+      btn.style.borderColor = t.id === currentTheme.id ? '#ffffff' : 'rgba(255,255,255,0.1)';
+      btn.title = t.name;
+      btn.setAttribute('onclick', `setTheme('${t.id}')`);
+      
+      const dot = document.createElement('div');
+      dot.className = `w-2 h-2 rounded-full bg-white transition-opacity duration-300 ${t.id === currentTheme.id ? 'opacity-100' : 'opacity-0'}`;
+      btn.appendChild(dot);
+      pickerContainer.appendChild(btn);
+    });
+
+    function setTheme(themeId) {
+      const selected = THEMES.find(t => t.id === themeId);
+      if (!selected) return;
+      currentTheme = selected;
+
+      document.documentElement.style.setProperty('--theme-color-primary', selected.primary);
+      document.getElementById('logo-text').style.color = selected.primary;
+      document.getElementById('logo-icon-i').style.color = selected.primary;
+      document.getElementById('current-mode-title').style.color = selected.primary;
+      document.getElementById('translate-trigger-btn').style.backgroundColor = selected.primary;
+      document.getElementById('translate-trigger-btn').style.boxShadow = `0 10px 15px -3px rgba(${selected.rgb}, 0.3)`;
+      document.getElementById('card-top-glow-left').style.backgroundImage = `linear-gradient(to right, transparent, ${selected.primary}, transparent)`;
+      document.getElementById('card-top-glow-right').style.backgroundImage = `linear-gradient(to right, transparent, ${selected.primary}, transparent)`;
+      document.getElementById('sidebar-title-text').style.color = selected.primary;
+
+      document.querySelectorAll('.theme-swatch').forEach(sw => {
+        const dot = sw.firstChild;
+        if (sw.style.backgroundColor === selected.primary || sw.title === selected.name) {
+          sw.style.borderColor = '#ffffff';
+          if (dot) dot.classList.replace('opacity-0', 'opacity-100');
+        } else {
+          sw.style.borderColor = 'rgba(255,255,255,0.1)';
+          if (dot) dot.classList.replace('opacity-100', 'opacity-0');
+        }
+      });
+      initBlobs();
+    }
+
+    // --- CANVAS RENDERING ---
+    const canvas = document.getElementById('liquid-canvas');
+    const ctx = canvas.getContext('2d');
+    let width = canvas.width = window.innerWidth;
+    let height = canvas.height = window.innerHeight;
+    let blobs = [];
+
+    class Blob {
+      constructor(color, radius) {
+        this.x = Math.random() * width; this.y = Math.random() * height;
+        this.vx = (Math.random() - 0.5) * 1.5; this.vy = (Math.random() - 0.5) * 1.5;
+        this.radius = radius; this.color = color;
+      }
+      update() {
+        this.x += this.vx; this.y += this.vy;
+        if (this.x < -this.radius) this.x = width + this.radius;
+        if (this.x > width + this.radius) this.x = -this.radius;
+        if (this.y < -this.radius) this.y = height + this.radius;
+        if (this.y > height + this.radius) this.y = -this.radius;
+      }
+      draw() {
+        ctx.save(); ctx.beginPath();
+        let gradient = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.radius);
+        gradient.addColorStop(0, this.color); gradient.addColorStop(1, 'rgba(11, 12, 21, 0)');
+        ctx.fillStyle = gradient; ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fill(); ctx.restore();
+      }
+    }
+
+    function initBlobs() {
+      blobs = [];
+      for (let i = 0; i < 4; i++) {
+        blobs.push(new Blob(currentTheme.bgBlobs[i % currentTheme.bgBlobs.length], width * 0.4));
+      }
+    }
+
+    function animateCanvas() {
+      ctx.fillStyle = '#0b0c15'; ctx.fillRect(0, 0, width, height);
+      blobs.forEach(b => { b.update(); b.draw(); });
+      requestAnimationFrame(animateCanvas);
+    }
+
+    // --- SWAP CHẾ ĐỘ ---
+    let activeMode = 'text';
+
+    function switchMode(mode, element) {
+      activeMode = mode;
+      
+      document.querySelectorAll('.quick-mode-btn').forEach(btn => {
+        btn.classList.remove('mode-active');
+        btn.style.borderColor = 'transparent';
+      });
+
+      document.querySelectorAll('.quick-mode-btn').forEach(btn => {
+        if (btn.getAttribute('onclick').includes(`'${mode}'`)) {
+          btn.classList.add('mode-active');
+          btn.style.borderColor = currentTheme.primary;
+        }
+      });
+
+      const ribbonTitle = document.getElementById('current-mode-title');
+      const d = UI_DICTIONARY[currentUiLang];
+      let titleTranslated = d.modeText;
+      if (mode === 'image') titleTranslated = d.modeImage;
+      if (mode === 'voice') titleTranslated = d.modeVoice;
+      if (mode === 'doc') titleTranslated = d.modeDoc;
+      ribbonTitle.textContent = titleTranslated;
+
+      document.querySelectorAll('.mode-panel').forEach(panel => {
+        panel.classList.add('hidden');
+      });
+      const activePanel = document.getElementById(`source-panel-${mode}`);
+      if (activePanel) {
+        activePanel.classList.remove('hidden');
+      }
+
+      resetHighlightOverlays();
+      clearOutputs();
+    }
+
+    // --- ENGINE DỊCH THUẬT ---
+    async function performTranslation() {
+      let textToTranslate = "";
+      const d = UI_DICTIONARY[currentUiLang];
+      
+      if (activeMode === 'text') {
+        textToTranslate = document.getElementById('source-textarea').value.trim();
+        if (!textToTranslate) {
+          showToast(currentUiLang === 'vi' ? "Thiếu thông tin" : "Empty Input", d.placeholderText, "warning");
+          return;
+        }
+      } else if (activeMode === 'image') {
+        textToTranslate = document.getElementById('image-ocr-textarea').value.trim();
+        if (!textToTranslate) {
+          showToast(currentUiLang === 'vi' ? "Thiếu thông tin" : "Empty Input", d.placeholderOCR, "warning");
+          return;
+        }
+      } else if (activeMode === 'voice') {
+        textToTranslate = document.getElementById('voice-transcript-textarea').value.trim();
+        if (!textToTranslate) {
+          showToast(currentUiLang === 'vi' ? "Thiếu thông tin" : "Empty Input", d.placeholderVoice, "warning");
+          return;
+        }
+      } else if (activeMode === 'doc') {
+        textToTranslate = document.getElementById('doc-raw-textarea').value.trim();
+        if (!textToTranslate) {
+          showToast(currentUiLang === 'vi' ? "Thiếu thông tin" : "Empty Input", d.placeholderDoc, "warning");
+          return;
+        }
+      }
+
+      const loader = document.getElementById('translation-loader');
+      loader.classList.remove('hidden'); loader.classList.add('flex');
+
+      let sourceLang = document.getElementById('source-lang-select').value;
+      let targetLang = document.getElementById('target-lang-select').value;
+
+      try {
+        const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sourceLang}&tl=${targetLang}&dt=t&q=${encodeURIComponent(textToTranslate)}`;
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        let result = "";
+        if (data && data[0]) {
+          data[0].forEach(item => {
+            if (item[0]) result += item[0];
+          });
+        }
+
+        if (!result) result = textToTranslate;
+
+        document.getElementById('output-content-area').innerHTML = `<p class="leading-relaxed text-white">${result}</p>`;
+      } catch (error) {
+        console.error("Translation Engine Connection Error:", error);
+        document.getElementById('output-content-area').innerHTML = `<p class="leading-relaxed text-white">${textToTranslate}</p>`;
+        showToast(currentUiLang === 'vi' ? "Lỗi kết nối" : "Connection error", currentUiLang === 'vi' ? "Không thể liên kết máy chủ AI." : "Failed to connect to AI server.", "error");
+      } finally {
+        loader.classList.remove('flex'); loader.classList.add('hidden');
+      }
+    }
+
+
+    // --- CHỨC NĂNG TÁCH CHỮ VÀ HIGHLIGHT KHỚP VỊ TRÍ 100% ---
+    function prepareContainerForHighlighting(container, text) {
+      container.innerHTML = "";
+      
+      // Tách chữ và giữ lại toàn bộ khoảng trắng nguyên bản của văn bản để không gây lệch vị trí dòng chảy
+      const tokens = text.split(/(\s+)/);
+      let currentOffset = 0;
+
+      tokens.forEach(token => {
+        if (/^\s+$/.test(token)) {
+          // Tạo một nút Text thuần túy cho khoảng trắng, trình duyệt sẽ tự động dãn dòng chuẩn 100%
+          const spaceNode = document.createTextNode(token);
+          container.appendChild(spaceNode);
+          currentOffset += token.length;
+        } else if (token !== "") {
+          // Thẻ span cho chữ ở dạng Inline thuần túy, loại bỏ hoàn toàn inline-block gây lỗi lệch dòng
+          const span = document.createElement("span");
+          span.className = "tts-word text-gray-400";
+          span.textContent = token;
+          span.dataset.start = currentOffset;
+          span.dataset.end = currentOffset + token.length;
+          container.appendChild(span);
+          currentOffset += token.length;
+        }
+      });
+    }
+
+    function resetHighlightOverlays() {
+      // Ẩn tất cả overlay hiển thị tts highlight và phục hồi nguyên vẹn độ rõ nét của Textarea
+      const sourceOverlay = document.getElementById('source-highlight-overlay');
+      const imgOverlay = document.getElementById('image-highlight-overlay');
+      const voiceOverlay = document.getElementById('voice-highlight-overlay');
+      const docOverlay = document.getElementById('doc-highlight-overlay');
+
+      sourceOverlay.classList.add('hidden');
+      imgOverlay.classList.add('hidden');
+      voiceOverlay.classList.add('hidden');
+      docOverlay.classList.add('hidden');
+
+      document.getElementById('source-textarea').classList.remove('opacity-0', 'pointer-events-none');
+      document.getElementById('image-ocr-textarea').classList.remove('opacity-0', 'pointer-events-none');
+      document.getElementById('voice-transcript-textarea').classList.remove('opacity-0', 'pointer-events-none');
+      document.getElementById('doc-raw-textarea').classList.remove('opacity-0', 'pointer-events-none');
+    }
+
+
+    // --- KHẮC PHỤC HOÀN TOÀN CÂM TIẾNG & HIỆN TƯỢNG LỆCH CHỮ ---
+    function playAudio(target) {
+      let text = ""; 
+      let lang = "vi-VN";
+      let displayContainer = null;
+      let rawTextareaOrInput = null;
+
+      const waveId = target === 'source' ? 'source-wave-indicator' : 'target-wave-indicator';
+      const speakIconId = target === 'source' ? 'source-speak-icon' : 'target-speak-icon';
+
+      if (target === 'source') {
+        if (activeMode === 'text') {
+          rawTextareaOrInput = document.getElementById('source-textarea');
+          text = rawTextareaOrInput.value.trim();
+          displayContainer = document.getElementById('source-highlight-overlay');
+        } else if (activeMode === 'image') {
+          rawTextareaOrInput = document.getElementById('image-ocr-textarea');
+          text = rawTextareaOrInput.value.trim();
+          displayContainer = document.getElementById('image-highlight-overlay');
+        } else if (activeMode === 'voice') {
+          rawTextareaOrInput = document.getElementById('voice-transcript-textarea');
+          text = rawTextareaOrInput.value.trim();
+          displayContainer = document.getElementById('voice-highlight-overlay');
+        } else if (activeMode === 'doc') {
+          rawTextareaOrInput = document.getElementById('doc-raw-textarea');
+          text = rawTextareaOrInput.value.trim();
+          displayContainer = document.getElementById('doc-highlight-overlay');
+        }
+        if (!text) text = "Hello";
+        lang = document.getElementById('source-lang-select').value === 'vi' ? 'vi-VN' : 'en-US';
+      } else {
+        text = document.getElementById('output-content-area').innerText;
+        if (text.includes("Kết quả dịch sẽ hiển thị") || text.includes("The translation will appear")) return;
+        lang = document.getElementById('target-lang-select').value === 'vi' ? 'vi-VN' : 'en-US';
+        displayContainer = document.getElementById('output-content-area');
+      }
+
+      setAudioPlayingUI(waveId, speakIconId, true);
+
+      // Lưu trữ văn bản gốc của Đích để phục hồi trọn vẹn sau khi nói xong
+      const originalText = text;
+
+      // Nạp đoạn text tách từ mượt mà
+      prepareContainerForHighlighting(displayContainer, text);
+      
+      // Chế độ nguồn: ẩn textarea chính đi để tránh đè chữ lẫn nhau, hiển thị lớp chữ trong suốt chạy highlight mượt mà
+      if (target === 'source' && displayContainer && rawTextareaOrInput) {
+        rawTextareaOrInput.classList.add('opacity-0', 'pointer-events-none');
+        displayContainer.classList.remove('hidden');
+      }
+
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel(); // Xóa sạch hàng đợi TTS để chống lỗi câm tiếng
+
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = lang;
+        utterance.rate = 1.0;
+
+        utterance.onend = () => {
+          setAudioPlayingUI(waveId, speakIconId, false);
+          if (target === 'source') {
+            if (displayContainer) displayContainer.classList.add('hidden');
+            if (rawTextareaOrInput) rawTextareaOrInput.classList.remove('opacity-0', 'pointer-events-none');
+          } else {
+            // Đích: Khôi phục lại thẻ văn bản gốc thuần túy, sạch sẽ để người dùng sao chép dễ dàng
+            document.getElementById('output-content-area').textContent = originalText;
+          }
+        };
+
+        // Đồng bộ highlight theo từng word phát ra từ trình duyệt
+        utterance.onboundary = (event) => {
+          if (event.name === 'word') {
+            highlightActiveWord(displayContainer, event.charIndex);
+          }
+        };
+
+        utterance.onerror = (e) => {
+          console.warn("SpeechSynthesis error. Transitioning to Cloud Fallback Dynamic Audio Stream...", e);
+          playCloudFallbackTTS(text, lang, waveId, speakIconId, displayContainer, target, originalText, rawTextareaOrInput);
+        };
+
+        window.speechSynthesis.speak(utterance);
+      } else {
+        playCloudFallbackTTS(text, lang, waveId, speakIconId, displayContainer, target, originalText, rawTextareaOrInput);
+      }
+    }
+
+    // Highlighting Active Word matching charIndex offsets
+    function highlightActiveWord(container, charIndex) {
+      if (!container) return;
+      const spans = container.querySelectorAll('.tts-word');
+      
+      spans.forEach(span => {
+        const start = parseInt(span.dataset.start);
+        const end = parseInt(span.dataset.end);
+        
+        if (charIndex >= start && charIndex < end) {
+          // Chỉ tô màu chữ và thêm bóng đổ phát sáng tinh tế, tuyệt đối không chèn ô màu đen thô thiển
+          span.style.color = '#ffffff';
+          span.style.backgroundColor = `rgba(${currentTheme.rgb}, 0.25)`;
+          span.style.borderColor = currentTheme.primary;
+          span.style.textShadow = `0 0 10px rgba(${currentTheme.rgb}, 0.8)`;
+          span.style.transform = "scale(1.05)";
+          span.style.fontWeight = "800";
+        } else {
+          span.style.color = 'rgba(156, 163, 175, 0.6)'; // Chữ xung quanh tự động mờ nhẹ đi để nổi bật từ đang đọc
+          span.style.backgroundColor = 'transparent';
+          span.style.borderColor = 'transparent';
+          span.style.textShadow = 'none';
+          span.style.transform = "scale(1)";
+          span.style.fontWeight = "500";
+        }
+      });
+    }
+
+    // GIẢ LẬP THEO DÕI CHỮ CHO LUỒNG DỰ PHÒNG CLOUD TTS
+    function playCloudFallbackTTS(text, lang, waveId, speakIconId, displayContainer, target, originalText, rawTextareaOrInput) {
+      const cleanLangCode = lang.split('-')[0];
+      const audioUrl = `https://translate.google.com/translate_tts?ie=UTF-8&tl=${cleanLangCode}&client=tw-ob&q=${encodeURIComponent(text)}`;
+      const audio = new Audio(); 
+      audio.src = audioUrl;
+
+      audio.oncanplaythrough = () => {
+        audio.play().catch(e => {
+          setAudioPlayingUI(waveId, speakIconId, false);
+          if (target === 'source' && displayContainer) displayContainer.classList.add('hidden');
+          if (rawTextareaOrInput) rawTextareaOrInput.classList.remove('opacity-0', 'pointer-events-none');
+          showToast(currentUiLang === 'vi' ? "Lưu ý âm lượng" : "Volume Tip", currentUiLang === 'vi' ? "Vui lòng tăng âm lượng máy của bạn." : "Please turn up device volume.", "info");
+        });
+      };
+
+      // Đồng bộ tiến trình chạy chữ cho máy chủ đám mây
+      audio.ontimeupdate = () => {
+        if (!displayContainer) return;
+        const spans = displayContainer.querySelectorAll('.tts-word');
+        if (spans.length === 0) return;
+
+        const progress = audio.currentTime / audio.duration;
+        const targetWordIndex = Math.min(
+          spans.length - 1,
+          Math.floor(progress * spans.length)
+        );
+
+        spans.forEach((span, idx) => {
+          if (idx === targetWordIndex) {
+            span.style.color = '#ffffff';
+            span.style.backgroundColor = `rgba(${currentTheme.rgb}, 0.25)`;
+            span.style.borderColor = currentTheme.primary;
+            span.style.textShadow = `0 0 10px rgba(${currentTheme.rgb}, 0.8)`;
+            span.style.transform = "scale(1.05)";
+            span.style.fontWeight = "800";
+          } else {
+            span.style.color = 'rgba(156, 163, 175, 0.6)';
+            span.style.backgroundColor = 'transparent';
+            span.style.borderColor = 'transparent';
+            span.style.textShadow = 'none';
+            span.style.transform = "scale(1)";
+            span.style.fontWeight = "500";
+          }
+        });
+      };
+
+      audio.onend = () => {
+        setAudioPlayingUI(waveId, speakIconId, false);
+        if (target === 'source') {
+          if (displayContainer) displayContainer.classList.add('hidden');
+          if (rawTextareaOrInput) rawTextareaOrInput.classList.remove('opacity-0', 'pointer-events-none');
+        } else {
+          document.getElementById('output-content-area').textContent = originalText;
+        }
+      };
+
+      audio.onerror = () => {
+        setAudioPlayingUI(waveId, speakIconId, false);
+        if (target === 'source') {
+          if (displayContainer) displayContainer.classList.add('hidden');
+          if (rawTextareaOrInput) rawTextareaOrInput.classList.remove('opacity-0', 'pointer-events-none');
+        } else {
+          document.getElementById('output-content-area').textContent = originalText;
+        }
+      };
+    }
+
+    function setAudioPlayingUI(waveId, speakIconId, isPlaying) {
+      const wave = document.getElementById(waveId); const icon = document.getElementById(speakIconId);
+      if (isPlaying) { wave.classList.remove('hidden'); icon.classList.add('opacity-0'); } 
+      else { wave.classList.add('hidden'); icon.classList.remove('opacity-0'); }
+    }
+
+
+    // --- TƯƠNG TÁC CHẾ ĐỘ 2: ẢNH AI (MOCK OCR) ---
+    function triggerImageUpload() {
+      document.getElementById('image-file-input').click();
+    }
+
+    function handleImageUpload(e) {
+      e.stopPropagation();
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        document.getElementById('image-preview').src = event.target.result;
+        document.getElementById('image-preview-container').classList.remove('hidden');
+        document.getElementById('image-preview-container').classList.add('flex');
+        
+        const ocrTextarea = document.getElementById('image-ocr-textarea');
+        ocrTextarea.value = currentUiLang === 'vi' ? "Đang phân tích chữ trong ảnh..." : "Extracting text from image...";
+        setTimeout(() => {
+          ocrTextarea.value = "Hello, I know everything. Do you want me to help you?";
+          showToast(currentUiLang === 'vi' ? "AI Quét thành công" : "AI Scan Completed", currentUiLang === 'vi' ? "Văn bản trong ảnh đã được trích xuất hoàn tất." : "Image text has been fully extracted.", "success");
+        }, 1500);
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function removeUploadedImage(e) {
+      e.stopPropagation();
+      document.getElementById('image-file-input').value = "";
+      document.getElementById('image-preview-container').classList.remove('flex');
+      document.getElementById('image-preview-container').classList.add('hidden');
+      document.getElementById('image-ocr-textarea').value = "";
+      resetHighlightOverlays();
+    }
+
+    // --- TƯƠNG TÁC CHẾ ĐỘ 3: GIỌNG NÓI ---
+    let isVoiceRecordingActive = false;
+    let voiceTimer = null;
+
+    function toggleVoiceRecording() {
+      const statusText = document.getElementById('voice-status-text');
+      const pulse = document.getElementById('voice-pulse-outer');
+      const micIcon = document.getElementById('mic-icon');
+      const micBtn = document.getElementById('voice-mic-btn');
+      const transcriptBox = document.getElementById('voice-transcript-textarea');
+      const d = UI_DICTIONARY[currentUiLang];
+
+      if (!isVoiceRecordingActive) {
+        isVoiceRecordingActive = true;
+        statusText.innerHTML = `<span class="text-red-400 font-bold animate-pulse">${d.voiceStatusListening}</span>`;
+        pulse.classList.remove('hidden');
+        micIcon.className = 'fa-solid fa-square text-xl';
+        micBtn.style.backgroundColor = '#ef4444';
+        transcriptBox.value = currentUiLang === 'vi' ? "Đang chuyển âm thanh thành văn bản..." : "Translating voice audio to text...";
+
+        voiceTimer = setTimeout(() => {
+          isVoiceRecordingActive = false;
+          pulse.classList.add('hidden');
+          micIcon.className = 'fa-solid fa-microphone text-xl';
+          micBtn.style.backgroundColor = currentTheme.primary;
+          statusText.innerHTML = d.voiceStatusDone;
+          transcriptBox.value = "Hello, I'm Flervee and I live in Vietnam.";
+          showToast(currentUiLang === 'vi' ? "Nhận dạng thành công" : "Recognition Complete", currentUiLang === 'vi' ? "Giọng nói của bạn đã được chuyển dịch thành văn bản." : "Your speech was successfully transcribed.", "success");
+        }, 3000);
+      } else {
+        clearTimeout(voiceTimer);
+        isVoiceRecordingActive = false;
+        pulse.classList.add('hidden');
+        micIcon.className = 'fa-solid fa-microphone text-xl';
+        micBtn.style.backgroundColor = currentTheme.primary;
+        statusText.innerHTML = d.voiceStatusIdle;
+        transcriptBox.value = "";
+        resetHighlightOverlays();
+      }
+    }
+
+    // --- TƯƠNG TÁC CHẾ ĐỘ 4: TÀI LIỆU ---
+    function triggerDocUpload() {
+      document.getElementById('doc-file-input').click();
+    }
+
+    function handleDocUpload(e) {
+      e.stopPropagation();
+      const file = e.target.files[0];
+      if (!file) return;
+
+      document.getElementById('doc-name-text').textContent = file.name;
+      const typeIcon = document.getElementById('doc-type-icon');
+      if (file.name.endsWith('.docx') || file.name.endsWith('.doc')) {
+        typeIcon.className = "fa-regular fa-file-word text-4xl text-blue-400 mb-2";
+      } else if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+        typeIcon.className = "fa-regular fa-file-excel text-4xl text-green-400 mb-2";
+      } else {
+        typeIcon.className = "fa-regular fa-file-pdf text-4xl text-red-400 mb-2";
+      }
+
+      document.getElementById('doc-preview-container').classList.remove('hidden');
+      document.getElementById('doc-preview-container').classList.add('flex');
+
+      const docRaw = document.getElementById('doc-raw-textarea');
+      docRaw.value = currentUiLang === 'vi' ? "Đang giải mã định dạng file..." : "Decoding document format...";
+      setTimeout(() => {
+        docRaw.value = "Dear Customer, thank you for choosing Super Translate. We are excited to serve you.";
+        showToast(currentUiLang === 'vi' ? "Tải lên thành công" : "Upload Complete", currentUiLang === 'vi' ? "Tài liệu gốc đã sẵn sàng để chuyển ngữ." : "Source document is ready for translation.", "success");
+      }, 1200);
+    }
+
+    function removeUploadedDoc(e) {
+      e.stopPropagation();
+      document.getElementById('doc-file-input').value = "";
+      document.getElementById('doc-preview-container').classList.remove('flex');
+      document.getElementById('doc-preview-container').classList.add('hidden');
+      document.getElementById('doc-raw-textarea').value = "";
+      resetHighlightOverlays();
+    }
+
+    // --- MIC MICRO CHO TRANG CHÍNH ---
+    let isMainRecording = false;
+    function toggleMainInputMic() {
+      const icon = document.getElementById('main-mic-control-icon');
+      const btn = document.getElementById('main-mic-control-btn');
+      const textInput = document.getElementById('source-textarea');
+
+      if (!isMainRecording) {
+        isMainRecording = true;
+        btn.classList.add('bg-red-500/10', 'border-red-500/30', 'text-red-400');
+        icon.className = 'fa-solid fa-microphone-slash text-xs animate-pulse';
+        textInput.value = currentUiLang === 'vi' ? "Đang nhận diện giọng nói..." : "Listening to speech...";
+        setTimeout(() => {
+          textInput.value = "Hello, I know everything. Do you want me to help you?";
+          stopMainInputMic();
+        }, 3000);
+      } else {
+        stopMainInputMic();
+      }
+    }
+
+    function stopMainInputMic() {
+      isMainRecording = false;
+      const icon = document.getElementById('main-mic-control-icon');
+      const btn = document.getElementById('main-mic-control-btn');
+      btn.classList.remove('bg-red-500/10', 'border-red-500/30', 'text-red-400');
+      icon.className = 'fa-solid fa-microphone text-xs';
+    }
+
+    // --- HAMBURGER & SIDEBAR TOGGLE MECHANICS ---
+    const hamburgerBtn = document.getElementById('hamburger-btn');
+    const sidebarMenu = document.getElementById('sidebar-menu');
+    const sidebarOverlay = document.getElementById('sidebar-overlay');
+    let isSidebarOpen = false;
+
+    function openSidebar() {
+      isSidebarOpen = true; hamburgerBtn.classList.add('hamburger-active');
+      sidebarMenu.classList.remove('translate-x-full');
+      sidebarOverlay.classList.remove('opacity-0', 'pointer-events-none');
+      document.body.classList.add('sidebar-active');
+      document.querySelectorAll('.stagger-item').forEach(item => {
+        item.style.opacity = '1'; item.style.transform = 'translateY(0)';
+      });
+    }
+
+    function closeSidebar() {
+      isSidebarOpen = false; hamburgerBtn.classList.remove('hamburger-active');
+      sidebarMenu.classList.add('translate-x-full');
+      sidebarOverlay.classList.add('opacity-0', 'pointer-events-none');
+      document.body.classList.remove('sidebar-active');
+      document.querySelectorAll('.stagger-item').forEach(item => {
+        item.style.opacity = '0'; item.style.transform = 'translateY(20px)';
+      });
+    }
+
+    hamburgerBtn.addEventListener('click', (e) => {
+      e.stopPropagation(); if (isSidebarOpen) closeSidebar(); else openSidebar();
+    });
+    sidebarOverlay.addEventListener('click', () => { if (isSidebarOpen) closeSidebar(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && isSidebarOpen) closeSidebar(); });
+
+    // --- DYNAMIC PANELS & HELPERS ---
+    function clearText() {
+      document.getElementById('source-textarea').value = "";
+      document.getElementById('char-count').textContent = "0";
+      document.getElementById('image-ocr-textarea').value = "";
+      document.getElementById('voice-transcript-textarea').value = "";
+      document.getElementById('doc-raw-textarea').value = "";
+      resetHighlightOverlays();
+      clearOutputs();
+    }
+
+    function clearOutputs() {
+      const d = UI_DICTIONARY[currentUiLang];
+      document.getElementById('output-content-area').innerHTML = `<span id="output-placeholder-lbl" class="text-gray-500 italic text-base font-normal">${d.outputDefault}</span>`;
+    }
+
+    document.getElementById('source-textarea').addEventListener('input', (e) => {
+      document.getElementById('char-count').textContent = e.target.value.length;
+    });
+
+    function copyToClipboard() {
+      const text = document.getElementById('output-content-area').innerText;
+      if (text.includes("Kết quả dịch sẽ hiển thị") || text.includes("The translation will appear")) return;
+      navigator.clipboard.writeText(text).then(() => {
+        const copyToast = document.getElementById('copy-toast');
+        copyToast.classList.remove('opacity-0');
+        setTimeout(() => copyToast.classList.add('opacity-0'), 2000);
+      });
+    }
+
+    function showToast(title, body, type = "info") {
+      const toast = document.getElementById('toast-notification');
+      document.getElementById('toast-title').textContent = title;
+      document.getElementById('toast-body').textContent = body;
+      toast.classList.remove('translate-y-12', 'opacity-0', 'pointer-events-none');
+      setTimeout(dismissToast, 4000);
+    }
+
+    function dismissToast() {
+      document.getElementById('toast-notification').classList.add('translate-y-12', 'opacity-0', 'pointer-events-none');
+    }
+
+    function checkHTTPSAndEnvironment() {
+      const badge = document.getElementById('https-badge');
+      const isHttps = window.location.protocol === 'https:';
+      const d = UI_DICTIONARY[currentUiLang];
+      
+      if (!isHttps) {
+        badge.className = "px-2 py-1 bg-red-500/10 text-red-400 border border-red-500/20 text-[9px] rounded font-bold tracking-wide flex items-center space-x-1";
+        badge.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i><span>${d.securingHttp}</span>`;
+      } else {
+        badge.className = "px-2 py-1 bg-green-500/10 text-green-400 border border-green-500/20 text-[9px] rounded font-bold tracking-wide flex items-center space-x-1";
+        badge.innerHTML = `<i class="fa-solid fa-shield-halved"></i><span>${d.securingHttps}</span>`;
+      }
+    }
+
+    window.onload = function() { 
+      initBlobs(); 
+      animateCanvas(); 
+      setTheme('purple');
+      setUiLanguage('vi'); // Khởi tạo mặc định ở Tiếng Việt
+    };
+  </script>
+</body>
+</html>
